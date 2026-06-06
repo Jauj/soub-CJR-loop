@@ -108,6 +108,21 @@ export default function AdminEditor({ articleToEdit, categories, articles = [], 
         id: articleToEdit?.id
       });
       toast.success("Article enregistré avec succès !");
+
+      // Déclencher le rebuild et le déploiement automatique
+      try {
+        await fetch("https://deploy-webhook-cjr.vercel.app/api/trigger-deploy", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer CJRsecret2026"  // ⚠️ Remplacez par votre vrai secret partagé
+          },
+          body: JSON.stringify({})
+        });
+      } catch (webhookError) {
+        console.error("Erreur webhook (déploiement non déclenché) :", webhookError);
+      }
+
       onClose();
     } catch (error: any) {
       console.error("Erreur lors de la sauvegarde:", error);
