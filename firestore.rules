@@ -1,0 +1,205 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: articles
+    // Fields:
+    //   - titre: string (required, 1-200 chars)
+    //   - slug: string (optional, 1-100 chars)
+    //   - extrait: string (optional, 0-1000 chars)
+    //   - contenuComplet: string (required, 1-100000 chars)
+    //   - date: string (required, ISO format YYYY-MM-DD)
+    //   - dateAffichee: string (optional, 0-100 chars)
+    //   - indexations: list (optional, max 50 items)
+    //   - authorUid: string (optional)
+    //   - pdfUrl: string (optional, URL format)
+    //
+    // Collection: categories
+    // Fields:
+    //   - nom: string (required, 1-100 chars)
+    //   - ordre: number (required)
+    //
+    // Collection: liens
+    // Fields:
+    //   - nom: string (required, 1-200 chars)
+    //   - url: string (required, URL format)
+    //   - description: string (optional, 0-1000 chars)
+    //   - categorieId: string (optional)
+    //   - dateAjout: string (optional)
+    //
+    // Collection: content
+    // Fields:
+    //   - content: string (required, 1-100000 chars)
+    //
+    // Collection: bulletins
+    // Fields:
+    //   - numero: string (required, 1-50 chars)
+    //   - titre: string (optional, 0-200 chars)
+    //   - date: string (required, 1-100 chars)
+    //   - couvertureUrl: string (required, URL format)
+    //   - pdfUrl: string (required, URL format)
+    //   - ordre: number (required)
+    //
+    // Collection: subscribers
+    // Fields:
+    //   - email: string (required, email format)
+    //   - dateInscription: string (required, ISO format)
+    //
+    // Collection: newsletters
+    // Fields:
+    //   - titre: string (required)
+    //   - contenuMarkdown: string (required)
+    //   - dateCreation: string (required)
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if the user is an administrator
+    function isAdmin() {
+      return isAuthenticated() &&
+        (
+          request.auth.token.email == "ferrierjonas@gmail.com" || 
+          request.auth.token.email == "cjr.soub@gmail.com" ||
+          request.auth.token.email == "admin@cjr.fr" ||
+          request.auth.uid == "KoXFxaV2eUNNEG3pTP0ioz6z4qr2"
+        );
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https?://.*") || url.size() == 0);
+    }
+
+    // Domain Validators
+    function isValidArticle() {
+      let data = request.resource.data;
+      return hasRequiredFields(['titre', 'contenuComplet', 'date']) &&
+             data.titre is string && data.titre.size() > 0 && data.titre.size() < 200 &&
+             (!('slug' in data) || (data.slug is string && data.slug.size() <= 100)) &&
+             data.contenuComplet is string && data.contenuComplet.size() > 0 && data.contenuComplet.size() <= 100000 &&
+             data.date is string && data.date.matches("^\\d{4}-\\d{2}-\\d{2}$") &&
+             (!('extrait' in data) || (data.extrait is string && data.extrait.size() <= 1000)) &&
+             (!('dateAffichee' in data) || (data.dateAffichee is string && data.dateAffichee.size() <= 100)) &&
+             (!('indexations' in data) || (data.indexations is list && data.indexations.size() <= 50)) &&
+             (!('authorUid' in data) || data.authorUid is string) &&
+             (!('pdfUrl' in data) || isValidUrl(data.pdfUrl));
+    }
+
+    function isValidCategory() {
+      let data = request.resource.data;
+      return hasRequiredFields(['nom', 'ordre']) &&
+             hasOnlyAllowedFields(['nom', 'ordre', 'id']) &&
+             data.nom is string && data.nom.size() > 0 && data.nom.size() <= 100 &&
+             data.ordre is number;
+    }
+
+    function isValidLien() {
+      let data = request.resource.data;
+      return hasRequiredFields(['nom', 'url']) &&
+             hasOnlyAllowedFields(['nom', 'url', 'description', 'categorieId', 'dateAjout', 'id']) &&
+             data.nom is string && data.nom.size() > 0 && data.nom.size() <= 200 &&
+             data.url is string && isValidUrl(data.url) &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 1000));
+    }
+
+    function isValidContent() {
+      let data = request.resource.data;
+      return hasRequiredFields(['content']) &&
+             hasOnlyAllowedFields(['content', 'id']) &&
+             data.content is string && data.content.size() <= 100000;
+    }
+
+    function isValidBulletin() {
+      let data = request.resource.data;
+      return hasRequiredFields(['numero', 'date', 'couvertureUrl', 'pdfUrl', 'ordre']) &&
+             hasOnlyAllowedFields(['numero', 'titre', 'date', 'couvertureUrl', 'pdfUrl', 'ordre', 'id']) &&
+             data.numero is string && data.numero.size() > 0 && data.numero.size() <= 50 &&
+             data.date is string && data.date.size() > 0 && data.date.size() <= 100 &&
+             data.couvertureUrl is string && isValidUrl(data.couvertureUrl) &&
+             data.pdfUrl is string && isValidUrl(data.pdfUrl) &&
+             data.ordre is number &&
+             (!('titre' in data) || (data.titre is string && data.titre.size() < 200));
+    }
+
+    function isValidSubscriber() {
+      let data = request.resource.data;
+      return hasRequiredFields(['email', 'dateInscription']) &&
+             data.email is string && data.email.size() < 128 &&
+             data.email.matches("^[^@]+@[^@]+\\.[^@]+$") &&
+             data.dateInscription is string;
+    }
+
+    function isValidNewsletter() {
+      let data = request.resource.data;
+      return hasRequiredFields(['titre', 'contenuMarkdown', 'dateCreation']) &&
+             data.titre is string && data.titre.size() > 0 && data.titre.size() < 200 &&
+             data.contenuMarkdown is string && data.contenuMarkdown.size() > 0 && data.contenuMarkdown.size() < 100000 &&
+             data.dateCreation is string;
+    }
+
+    // Rules
+    match /articles/{articleId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidArticle();
+      allow delete: if isAdmin();
+    }
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidCategory();
+      allow delete: if isAdmin();
+    }
+
+    match /liens/{lienId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidLien();
+      allow delete: if isAdmin();
+    }
+
+    match /content/{contentId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidContent();
+      allow delete: if isAdmin();
+    }
+
+    match /bulletins/{bulletinId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidBulletin();
+      allow delete: if isAdmin();
+    }
+
+    match /subscribers/{subscriberId} {
+      allow read: if isAdmin();
+      allow list: if true;
+      allow create: if isValidSubscriber();
+      allow update: if isAdmin() && isValidSubscriber();
+      allow delete: if isAdmin();
+    }
+
+    match /newsletters/{newsletterId} {
+      allow read: if isAdmin();
+      allow list: if isAdmin();
+      allow create, update: if isAdmin() && isValidNewsletter();
+      allow delete: if isAdmin();
+    }
+    
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

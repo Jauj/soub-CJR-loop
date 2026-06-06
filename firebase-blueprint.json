@@ -1,0 +1,133 @@
+{
+  "entities": {
+    "Article": {
+      "title": "Article",
+      "description": "Un article de blog ou une publication.",
+      "type": "object",
+      "properties": {
+        "titre": { "type": "string", "description": "Titre de l'article" },
+        "extrait": { "type": "string", "description": "Résumé court" },
+        "contenuComplet": { "type": "string", "description": "Contenu Markdown" },
+        "date": { "type": "string", "format": "date", "description": "Date de publication (ISO)" },
+        "dateAffichee": { "type": "string", "description": "Date formatée pour l'affichage" },
+        "authorUid": { "type": "string", "description": "UID de l'auteur" },
+        "pdfUrl": { "type": "string", "format": "uri", "description": "URL vers un fichier PDF" },
+        "id": { "type": "string", "description": "Identifiant unique (Firestore ID)" },
+        "indexations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "categorie": { "type": "string" },
+              "terme": { "type": "string" }
+            }
+          }
+        }
+      },
+      "required": ["titre", "contenuComplet", "date"]
+    },
+    "Category": {
+      "title": "Catégorie",
+      "description": "Une catégorie thématique.",
+      "type": "object",
+      "properties": {
+        "nom": { "type": "string" },
+        "ordre": { "type": "number" },
+        "id": { "type": "string" }
+      },
+      "required": ["nom", "ordre"]
+    },
+    "Lien": {
+      "title": "Lien Ressource",
+      "description": "Un lien externe vers une ressource.",
+      "type": "object",
+      "properties": {
+        "nom": { "type": "string" },
+        "url": { "type": "string", "format": "uri" },
+        "description": { "type": "string" },
+        "categorieId": { "type": "string" },
+        "dateAjout": { "type": "string", "format": "date-time" },
+        "id": { "type": "string" }
+      },
+      "required": ["nom", "url"]
+    },
+    "Content": {
+      "title": "Contenu Statique",
+      "description": "Contenu textuel pour les pages fixes (ex: A Propos).",
+      "type": "object",
+      "properties": {
+        "content": { "type": "string" },
+        "id": { "type": "string" }
+      },
+      "required": ["content"]
+    },
+    "Bulletin": {
+      "title": "Bulletin PDF",
+      "description": "Un numéro du bulletin Socialisme ou Barbarie.",
+      "type": "object",
+      "properties": {
+        "numero": { "type": "string", "description": "Numéro du bulletin" },
+        "titre": { "type": "string", "description": "Titre optionnel" },
+        "date": { "type": "string", "description": "Date de parution" },
+        "couvertureUrl": { "type": "string", "format": "uri", "description": "URL de l'image de couverture" },
+        "pdfUrl": { "type": "string", "format": "uri", "description": "URL du fichier PDF" },
+        "ordre": { "type": "number", "description": "Ordre d'affichage" },
+        "id": { "type": "string" }
+      },
+      "required": ["numero", "date", "couvertureUrl", "pdfUrl", "ordre"]
+    },
+    "Subscriber": {
+      "title": "Abonné Newsletter",
+      "description": "Un utilisateur inscrit à la newsletter.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "dateInscription": { "type": "string", "format": "date-time" },
+        "id": { "type": "string" }
+      },
+      "required": ["email", "dateInscription"]
+    },
+    "Newsletter": {
+      "title": "Newsletter (Bulletin mail)",
+      "description": "Contenu d'une newsletter à envoyer par mail.",
+      "type": "object",
+      "properties": {
+        "titre": { "type": "string" },
+        "contenuMarkdown": { "type": "string" },
+        "dateCreation": { "type": "string", "format": "date-time" },
+        "id": { "type": "string" }
+      },
+      "required": ["titre", "contenuMarkdown", "dateCreation"]
+    }
+  },
+  "firestore": {
+    "/articles/{articleId}": {
+      "schema": "Article",
+      "description": "Collection des articles"
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Collection des catégories"
+    },
+    "/liens/{lienId}": {
+      "schema": "Lien",
+      "description": "Collection des liens ressources"
+    },
+    "/content/{contentId}": {
+      "schema": "Content",
+      "description": "Contenus textuels divers"
+    },
+    "/bulletins/{bulletinId}": {
+      "schema": "Bulletin",
+      "description": "Collection des bulletins PDF"
+    },
+    "/subscribers/{subscriberId}": {
+      "schema": "Subscriber",
+      "description": "Collection des abonnés newsletter"
+    },
+    "/newsletters/{newsletterId}": {
+      "schema": "Newsletter",
+      "description": "Collection des bulletins newsletter"
+    }
+  }
+}
