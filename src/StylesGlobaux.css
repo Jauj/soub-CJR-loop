@@ -53,3 +53,135 @@
   margin-top: 2rem;
   margin-bottom: 1rem;
 }
+
+/* === OPTIMISATIONS POUR LE MODE LECTURE (FIREFOX/SAFARI) === */
+
+/* Sémantique HTML pour une meilleure extraction du contenu */
+article {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+article[itemscope][itemtype="https://schema.org/NewsArticle"] {
+  display: block;
+}
+
+/* === STYLES D'IMPRESSION (@media print) === */
+@media print {
+  /* Masquer les éléments de navigation et UI */
+  aside,
+  nav,
+  header,
+  .md\:hidden,
+  button,
+  [role="navigation"],
+  .border-r,
+  .sticky {
+    display: none !important;
+  }
+
+  /* Optimiser le contenu principal pour l'impression */
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Articles et sections lisibles */
+  article {
+    page-break-inside: avoid;
+    margin-bottom: 2rem;
+    break-inside: avoid;
+  }
+
+  /* Couleurs en mode impression */
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Garantir que les textes restent noirs/gris */
+  * {
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  a {
+    color: #0066cc !important;
+    text-decoration: underline !important;
+  }
+
+  /* Images optimisées pour l'impression */
+  img {
+    max-width: 100% !important;
+    page-break-inside: avoid;
+  }
+
+  /* Titres bien espacés */
+  h1, h2, h3, h4, h5, h6 {
+    page-break-after: avoid;
+    page-break-inside: avoid;
+    margin-top: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  /* Paragraphes bien formatés */
+  p {
+    orphans: 3;
+    widows: 3;
+    page-break-inside: avoid;
+  }
+
+  /* Liens visibles dans les PDFs */
+  a[href]:after {
+    content: "";
+  }
+
+  /* Masquer le scroll et les éléments mobiles */
+  .overflow-y-auto,
+  .overflow-x-auto,
+  .scrollbar-hide {
+    overflow: visible !important;
+  }
+}
+
+/* === OPTIMISATIONS POUR LE MODE LECTEUR (Firefox Reader View / Safari Reader) === */
+
+/* Éviter les conteneurs de trop grande profondeur */
+div.space-y-16 > div {
+  margin-bottom: 2rem;
+}
+
+/* Balises sémantiques bien structurées */
+article header {
+  display: block;
+  margin-bottom: 2rem;
+}
+
+article footer {
+  display: block;
+  margin-top: 2rem;
+  border-top: 1px solid rgba(0,0,0,0.1);
+  padding-top: 1rem;
+}
+
+/* Contenu principal bien délimité */
+main {
+  display: block;
+}
+
+section {
+  display: block;
+}
+
+/* Améliorer la lisibilité du contenu pour le lecteur */
+article > * {
+  line-height: 1.7;
+}
+
+/* Éviter les débordements */
+article img {
+  max-width: 100% !important;
+  height: auto !important;
+  display: block;
+}
