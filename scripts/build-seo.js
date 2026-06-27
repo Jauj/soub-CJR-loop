@@ -198,8 +198,11 @@ function generateStaticPageJsonLd(pageName, pageUrl) {
 }
 
 // ============================================================
-// Lire le SPA shell construit par Vite (dist/index.html)
-// et injecter le contenu SEO + meta dans <div id="root">
+// Generer une page SEO a partir du vrai SPA shell Vite.
+// Seul le <head> est modifie (meta + JSON-LD).
+// Le <body> est COPIE TEL QUEL depuis le shell Vite :
+// skeleton inline + <div id="root"> vide + JS/CSS Vite.
+// React hydrate normalement -> UI d'origine preservee.
 // ============================================================
 
 function loadViteShell() {
@@ -209,19 +212,18 @@ function loadViteShell() {
 
 function buildSeoPage(title, description, contentHtml, canonicalUrl, jsonLd = null, viteShell) {
   const metaDesc = cleanMetaDescription(description || 'Socialisme ou Barbarie - Cercle de Jeunes Revolutionnaires');
+
+  // Extraire le <body>...</body> du shell Vite intact (skeleton + root + scripts)
+  const bodyMatch = viteShell.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  const bodyContent = bodyMatch ? bodyMatch[1] : '<div id="root"></div>';
+
+  // Construire le bloc JSON-LD
   const jsonLdBlock = jsonLd
     ? `\n    <script type="application/ld+json">${jsonLd}</script>`
     : '';
 
-  // Extraire les chemins des assets Vite depuis le shell
-  const cssMatches = [...viteShell.matchAll(/<link[^>]*href="(\/assets\/[^"]+\.css)"[^>]*>/g)];
-  const jsMatches = [...viteShell.matchAll(/<script[^>]*src="(\/assets\/[^"]+\.js)"[^>]*><\/script>/g)];
-  // Aussi attraper les scripts type="module"
-  const jsModuleMatches = [...viteShell.matchAll(/<script[^>]*type="module"[^>]*src="(\/assets\/[^"]+\.js)"[^>]*><\/script>/g)];
-  const allJs = [...jsMatches, ...jsModuleMatches];
-
-  const cssLinks = cssMatches.map(m => m[1]).join('\n    ');
-  const jsScripts = allJs.map(m => `    <script type="module" src="${m[1]}"></script>`).join('\n');
+  // Determiner le type OG
+  const ogType = contentHtml && contentHtml.includes('article-card') ? 'website' : 'article';
 
   return `<!doctype html>
 <html lang="fr">
@@ -236,7 +238,7 @@ function buildSeoPage(title, description, contentHtml, canonicalUrl, jsonLd = nu
     <link rel="canonical" href="${canonicalUrl}" />
 
     <!-- Open Graph -->
-    <meta property="og:type" content="article" />
+    <meta property="og:type" content="${ogType}" />
     <meta property="og:url" content="${canonicalUrl}" />
     <meta property="og:title" content="${title} | Socialisme ou Barbarie" />
     <meta property="og:description" content="${metaDesc}" />
@@ -249,14 +251,10 @@ function buildSeoPage(title, description, contentHtml, canonicalUrl, jsonLd = nu
     <meta name="twitter:description" content="${metaDesc}" />
     <meta name="twitter:image" content="https://cjr-soub.fr/logo-cjr.jpg" />${jsonLdBlock}
 
-    <!-- Vite CSS -->
-    ${cssLinks}
+    <!-- Vite assets (CSS extrait du shell) -->
+    ${[...viteShell.matchAll(/<link[^>]*href="(\/assets\/[^"]+\.css)"[^>]*\/?>/g)].map(m => m[0]).join('\n    ')}
   </head>
-  <body>
-    <div id="root">${contentHtml}</div>
-${jsScripts}
-    <script>window.__hideSkeleton && window.__hideSkeleton();</script>
-  </body>
+  <body>${bodyContent}</body>
 </html>`;
 }
 
