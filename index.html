@@ -29,7 +29,67 @@
     <!-- Google Analytics placeholder removed -->
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Skeleton d'attente : affiché instantanement, remplace par React au hydration -->
+    <style>
+      #initial-skeleton{display:flex;min-height:100vh;background:#fff}
+      #initial-skeleton .sk-sidebar{width:280px;border-right:1px solid rgba(0,0,0,.1);display:flex;flex-direction:column;align-items:center;padding:3rem 1rem;flex-shrink:0}
+      #initial-skeleton .sk-sidebar .sk-logo{width:80px;height:80px;border-radius:50%;background:rgba(0,0,0,.06);margin-bottom:1.5rem}
+      #initial-skeleton .sk-sidebar .sk-title{height:14px;width:140px;background:rgba(0,0,0,.08);border-radius:4px;margin-bottom:8px}
+      #initial-skeleton .sk-sidebar .sk-title2{height:10px;width:100px;background:rgba(0,0,0,.05);border-radius:4px;margin-bottom:2.5rem}
+      #initial-skeleton .sk-sidebar .sk-nav{display:flex;flex-direction:column;gap:12px;width:100%}
+      #initial-skeleton .sk-sidebar .sk-nav-item{height:32px;background:rgba(0,0,0,.04);border-radius:6px}
+      #initial-skeleton .sk-sidebar .sk-nav-item.active{background:rgba(0,0,0,.08)}
+      #initial-skeleton .sk-main{flex:1;padding:3rem 3rem 3rem 4rem;max-width:800px}
+      #initial-skeleton .sk-main .sk-heading{height:36px;width:70%;background:rgba(0,0,0,.1);border-radius:6px;margin-bottom:2rem}
+      #initial-skeleton .sk-main .sk-line{height:12px;background:rgba(0,0,0,.05);border-radius:4px;margin-bottom:12px}
+      #initial-skeleton .sk-main .sk-line:nth-child(2){width:100%}
+      #initial-skeleton .sk-main .sk-line:nth-child(3){width:85%}
+      #initial-skeleton .sk-main .sk-line:nth-child(4){width:92%}
+      #initial-skeleton .sk-main .sk-line:nth-child(5){width:60%}
+      #initial-skeleton .sk-main .sk-line:nth-child(7){width:100%}
+      #initial-skeleton .sk-main .sk-line:nth-child(8){width:78%}
+      #initial-skeleton .sk-main .sk-line:nth-child(9){width:88%}
+      #initial-skeleton .sk-main .sk-line:nth-child(10){width:45%}
+      #initial-skeleton .sk-main .sk-block{height:120px;background:rgba(0,0,0,.03);border-radius:8px;margin-top:2rem;border:1px solid rgba(0,0,0,.06)}
+      @keyframes sk-pulse{0%,100%{opacity:1}50%{opacity:.4}}
+      #initial-skeleton [class*="sk-"]{animation:sk-pulse 1.5s ease-in-out infinite}
+      @media(max-width:768px){#initial-skeleton{flex-direction:column}#initial-skeleton .sk-sidebar{width:100%;border-right:none;border-bottom:1px solid rgba(0,0,0,.1);padding:1.5rem;flex-direction:row;gap:1rem}#initial-skeleton .sk-sidebar .sk-nav{display:none}#initial-skeleton .sk-main{padding:1.5rem}}
+    </style>
+    <div id="initial-skeleton">
+      <div class="sk-sidebar">
+        <div class="sk-logo"></div>
+        <div class="sk-title"></div>
+        <div class="sk-title2"></div>
+        <div class="sk-nav">
+          <div class="sk-nav-item active"></div>
+          <div class="sk-nav-item"></div>
+          <div class="sk-nav-item"></div>
+          <div class="sk-nav-item"></div>
+        </div>
+      </div>
+      <div class="sk-main">
+        <div class="sk-heading"></div>
+        <div class="sk-line"></div>
+        <div class="sk-line"></div>
+        <div class="sk-line"></div>
+        <div class="sk-line"></div>
+        <div class="sk-block"></div>
+        <div class="sk-line" style="margin-top:1.5rem"></div>
+        <div class="sk-line"></div>
+        <div class="sk-line"></div>
+        <div class="sk-line"></div>
+      </div>
+    </div>
+    <div id="root" style="display:none"></div>
+    <script>
+      // Des que React prend la main, cacher le skeleton et montrer le root
+      window.__hideSkeleton = function() {
+        var s = document.getElementById('initial-skeleton');
+        var r = document.getElementById('root');
+        if (s) s.style.display = 'none';
+        if (r) r.style.display = '';
+      };
+    </script>
     <script type="module" src="/src/Entree.tsx"></script>
   </body>
 </html>
