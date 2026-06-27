@@ -197,16 +197,31 @@ function generateStaticPageJsonLd(pageName, pageUrl) {
   ]);
 }
 
-// Template wrapping function containing theme HTML
 // ============================================================
-// CORRECTION P0 : suppression de <script type="module" src="/src/Entree.tsx">
-// CORRECTION P1 : ajout du parametre jsonLd pour les donnees structurees
+// Lire le SPA shell construit par Vite (dist/index.html)
+// et injecter le contenu SEO + meta dans <div id="root">
 // ============================================================
-function getHtmlWrapper(title, description, contentHtml, canonicalUrl, jsonLd = null) {
+
+function loadViteShell() {
+  const shellPath = path.join(process.cwd(), 'dist', 'index.html');
+  return fs.readFileSync(shellPath, 'utf-8');
+}
+
+function buildSeoPage(title, description, contentHtml, canonicalUrl, jsonLd = null, viteShell) {
   const metaDesc = cleanMetaDescription(description || 'Socialisme ou Barbarie - Cercle de Jeunes Revolutionnaires');
   const jsonLdBlock = jsonLd
     ? `\n    <script type="application/ld+json">${jsonLd}</script>`
     : '';
+
+  // Extraire les chemins des assets Vite depuis le shell
+  const cssMatches = [...viteShell.matchAll(/<link[^>]*href="(\/assets\/[^"]+\.css)"[^>]*>/g)];
+  const jsMatches = [...viteShell.matchAll(/<script[^>]*src="(\/assets\/[^"]+\.js)"[^>]*><\/script>/g)];
+  // Aussi attraper les scripts type="module"
+  const jsModuleMatches = [...viteShell.matchAll(/<script[^>]*type="module"[^>]*src="(\/assets\/[^"]+\.js)"[^>]*><\/script>/g)];
+  const allJs = [...jsMatches, ...jsModuleMatches];
+
+  const cssLinks = cssMatches.map(m => m[1]).join('\n    ');
+  const jsScripts = allJs.map(m => `    <script type="module" src="${m[1]}"></script>`).join('\n');
 
   return `<!doctype html>
 <html lang="fr">
@@ -234,177 +249,13 @@ function getHtmlWrapper(title, description, contentHtml, canonicalUrl, jsonLd = 
     <meta name="twitter:description" content="${metaDesc}" />
     <meta name="twitter:image" content="https://cjr-soub.fr/logo-cjr.jpg" />${jsonLdBlock}
 
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=Libre+Baskerville:italic&display=swap');
-
-      body {
-        font-family: 'Inter', sans-serif;
-        color: #111111;
-        background-color: #fafafa;
-        margin: 0;
-        padding: 0;
-        line-height: 1.6;
-      }
-      .container {
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 40px 20px;
-      }
-      header {
-        border-bottom: 2px solid #000;
-        padding-bottom: 20px;
-        margin-bottom: 40px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-      .brand-title {
-        font-size: 20px;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: -0.05em;
-        text-decoration: none;
-        color: #000;
-      }
-      .red-accent {
-        color: rgba(227, 36, 33, 1);
-      }
-      h1 {
-        font-size: 48px;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: -0.03em;
-        line-height: 1.05;
-        margin-top: 10px;
-        margin-bottom: 20px;
-      }
-      .date-badge {
-        font-size: 11px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.15em;
-        color: rgba(227, 36, 33, 1);
-      }
-      .chapo {
-        font-family: 'Libre Baskerville', serif;
-        font-style: italic;
-        font-size: 20px;
-        line-height: 1.6;
-        color: #333333;
-        border-left: 6px solid rgba(227, 36, 33, 1);
-        padding-left: 24px;
-        margin: 30px 0;
-      }
-      .article-content {
-        font-size: 18px;
-        line-height: 1.8;
-        color: #1f1f1f;
-      }
-      .article-content h2, .article-content h3 {
-        font-size: 28px;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: -0.02em;
-        margin-top: 40px;
-        margin-bottom: 20px;
-        border-bottom: 1px solid #ddd;
-        padding-bottom: 8px;
-      }
-      .article-content p {
-        margin-bottom: 24px;
-      }
-      .article-content blockquote {
-        border-left: 4px solid rgba(227, 36, 33, 1);
-        padding-left: 20px;
-        font-family: 'Libre Baskerville', serif;
-        font-style: italic;
-        font-size: 19px;
-        margin: 30px 0;
-        color: #555;
-      }
-      .article-content a {
-        color: rgba(227, 36, 33, 1);
-        text-decoration: underline;
-        font-weight: 500;
-      }
-      .article-content img {
-        max-width: 100%;
-        height: auto;
-        margin: 30px 0;
-        border: 1px solid #ddd;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-      }
-      .indexation {
-        margin-top: 40px;
-        border-top: 1px solid #eee;
-        padding-top: 20px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-      .tag {
-        background: #000;
-        color: #fff;
-        font-size: 10px;
-        font-weight: 700;
-        text-transform: uppercase;
-        padding: 4px 10px;
-        letter-spacing: 0.1em;
-      }
-      .btn-back {
-        display: inline-block;
-        background: #000;
-        color: #fff;
-        text-transform: uppercase;
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.1em;
-        padding: 10px 20px;
-        text-decoration: none;
-        margin-top: 40px;
-        border: 2px solid #000;
-        transition: all 0.2s;
-      }
-      .btn-back:hover {
-        background: transparent;
-        color: #000;
-      }
-      .article-card {
-        border: 2px solid #000;
-        padding: 30px;
-        margin-bottom: 24px;
-        background: #fff;
-      }
-      .article-card a {
-        text-decoration: none;
-        color: #000;
-      }
-      .article-card h2 {
-        font-size: 28px;
-        font-weight: 900;
-        text-transform: uppercase;
-        margin: 10px 0;
-        line-height: 1.1;
-      }
-      .article-card p {
-        font-size: 14px;
-        color: #666;
-        margin-bottom: 0;
-      }
-    </style>
+    <!-- Vite CSS -->
+    ${cssLinks}
   </head>
   <body>
-    <div id="root">
-      <div class="container">
-        <header>
-          <a href="/" class="brand-title">Socialisme <span class="red-accent">ou</span> Barbarie</a>
-          <a href="/publications" class="btn-back" style="margin: 0; padding: 6px 15px;">Dernieres publications</a>
-        </header>
-
-        ${contentHtml}
-
-      </div>
-    </div>
+    <div id="root">${contentHtml}</div>
+${jsScripts}
+    <script>window.__hideSkeleton && window.__hideSkeleton();</script>
   </body>
 </html>`;
 }
@@ -493,7 +344,12 @@ async function buildSEO() {
     }
 
     // ============================================================
-    // 0. NOUVEAU : PRE-RENDU DES PAGES STATIQUES (/, /qui-sommes-nous, /liens)
+    // 0. Charger le SPA shell Vite pour preserver les vrais assets
+    // ============================================================
+    const viteShell = loadViteShell();
+
+    // ============================================================
+    // 1. NOUVEAU : PRE-RENDU DES PAGES STATIQUES (/, /qui-sommes-nous, /liens)
     //    Corrige le P0-2 : duplicate content sur pages SPA vides
     //    Corrige le probleme de canonical URL incorrect sur les fallbacks
     // ============================================================
@@ -527,12 +383,13 @@ async function buildSEO() {
       homepageContent += `<p style="font-style: italic; color: #666;">Aucune publication pour le moment.</p>`;
     }
 
-    const homepageHtml = getHtmlWrapper(
+    const homepageHtml = buildSeoPage(
       'Socialisme ou Barbarie',
       'Bulletin de liaison du Cercle de Jeunes Revolutionnaires combattant pour le socialisme.',
       homepageContent,
       `${BASE_URL}/`,
-      generateStaticPageJsonLd('Accueil', BASE_URL)
+      generateStaticPageJsonLd('Accueil', BASE_URL),
+      viteShell
     );
     fs.writeFileSync(path.join(distPath, 'index.html'), homepageHtml, 'utf-8');
 
@@ -548,12 +405,13 @@ async function buildSEO() {
       </div>
       <a href="/publications" class="btn-back">Lire nos publications</a>
     `;
-    const qsnHtml = getHtmlWrapper(
+    const qsnHtml = buildSeoPage(
       'Qui sommes-nous',
       'Decouvrez le Cercle de Jeunes Revolutionnaires (CJR) - notre histoire, nos positions et notre combat pour le socialisme.',
       qsnContent,
       `${BASE_URL}/qui-sommes-nous`,
-      generateStaticPageJsonLd('Qui sommes-nous', `${BASE_URL}/qui-sommes-nous`)
+      generateStaticPageJsonLd('Qui sommes-nous', `${BASE_URL}/qui-sommes-nous`),
+      viteShell
     );
     const qsnDir = path.join(distPath, 'qui-sommes-nous');
     fs.mkdirSync(qsnDir, { recursive: true });
@@ -568,12 +426,13 @@ async function buildSEO() {
         <p>Retrouvez ici une selection de ressources et de liens vers des organisations, publications et outils militants en lien avec nos combats politiques.</p>
       </div>
     `;
-    const liensHtml = getHtmlWrapper(
+    const liensHtml = buildSeoPage(
       'Liens utiles',
       'Ressources et liens vers des organisations et publications militantes en lien avec le Cercle de Jeunes Revolutionnaires.',
       liensContent,
       `${BASE_URL}/liens`,
-      generateStaticPageJsonLd('Liens utiles', `${BASE_URL}/liens`)
+      generateStaticPageJsonLd('Liens utiles', `${BASE_URL}/liens`),
+      viteShell
     );
     const liensDir = path.join(distPath, 'liens');
     fs.mkdirSync(liensDir, { recursive: true });
@@ -621,12 +480,13 @@ async function buildSEO() {
       // CORRECTION P1 : injection du JSON-LD dans le HTML statique
       const jsonLd = generateArticleJsonLd(article, slug);
 
-      const rawHtml = getHtmlWrapper(
+      const rawHtml = buildSeoPage(
         article.titre,
         article.extrait || article.contenuComplet,
         articleBodyHtml,
         `${BASE_URL}/article/${slug}`,
-        jsonLd
+        jsonLd,
+        viteShell
       );
 
       fs.mkdirSync(path.dirname(outputPageFile), { recursive: true });
@@ -665,12 +525,13 @@ async function buildSEO() {
     }
     listHtml += `</div>`;
 
-    const publicationsRawHtml = getHtmlWrapper(
+    const publicationsRawHtml = buildSeoPage(
       "Analyses, Theses & Archives",
       "Retrouvez l'index complet de toutes nos publications, analyses theoriques et bulletins de liaison du Cercle de Jeunes Revolutionnaires.",
       listHtml,
       `${BASE_URL}/publications`,
-      generateStaticPageJsonLd('Publications', `${BASE_URL}/publications`)
+      generateStaticPageJsonLd('Publications', `${BASE_URL}/publications`),
+      viteShell
     );
 
     fs.mkdirSync(path.dirname(publicationsHtmlFile), { recursive: true });
