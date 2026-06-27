@@ -24,10 +24,23 @@ jobs:
       - name: Build project (Vite + SEO pages)
         run: npm run build
 
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          channelId: live
-          projectId: cjr-soub
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Deploy to Firebase Hosting
+        id: deploy
+        run: |
+          if npx firebase-tools deploy --only hosting --project cjr-soub --message "Deploy run ${{ github.run_number }}" 2>&1 | tee deploy.log; then
+            echo "deploy_status=success" >> "$GITHUB_OUTPUT"
+          else
+            if grep -q "is the current active version" deploy.log; then
+              echo "deploy_status=skipped" >> "$GITHUB_OUTPUT"
+              echo "::notice::Deploy skipped — content identical to current live version"
+            else
+              echo "deploy_status=failed" >> "$GITHUB_OUTPUT"
+              cat deploy.log
+              exit 1
+            fi
+          fi
