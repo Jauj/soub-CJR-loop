@@ -5,15 +5,7 @@ import https from 'https';
 const PROJECT_ID = 'cjr-soub';
 const BASE_URL = 'https://cjr-soub.fr';
 
-// Helper function to create recursive directories if not exist
-function ensureDirectoryExistence(filePath) {
-  const dirname = path.dirname(filePath);
-  if (fs.existsSync(dirname)) {
-    return true;
-  }
-  ensureDirectoryExistence(dirname);
-  fs.mkdirSync(dirname);
-}
+
 
 // Simple and robust regex-based Markdown to HTML parser
 function parseMarkdownToHtml(markdown) {
@@ -564,7 +556,7 @@ async function buildSEO() {
       generateStaticPageJsonLd('Qui sommes-nous', `${BASE_URL}/qui-sommes-nous`)
     );
     const qsnDir = path.join(distPath, 'qui-sommes-nous');
-    ensureDirectoryExistence(qsnDir);
+    fs.mkdirSync(qsnDir, { recursive: true });
     fs.writeFileSync(path.join(qsnDir, 'index.html'), qsnHtml, 'utf-8');
 
     // --- Liens ---
@@ -584,7 +576,7 @@ async function buildSEO() {
       generateStaticPageJsonLd('Liens utiles', `${BASE_URL}/liens`)
     );
     const liensDir = path.join(distPath, 'liens');
-    ensureDirectoryExistence(liensDir);
+    fs.mkdirSync(liensDir, { recursive: true });
     fs.writeFileSync(path.join(liensDir, 'index.html'), liensHtml, 'utf-8');
 
     // ============================================================
@@ -637,7 +629,7 @@ async function buildSEO() {
         jsonLd
       );
 
-      ensureDirectoryExistence(outputPageFile);
+      fs.mkdirSync(path.dirname(outputPageFile), { recursive: true });
       fs.writeFileSync(outputPageFile, rawHtml, 'utf-8');
     }
 
@@ -681,12 +673,12 @@ async function buildSEO() {
       generateStaticPageJsonLd('Publications', `${BASE_URL}/publications`)
     );
 
-    ensureDirectoryExistence(publicationsHtmlFile);
+    fs.mkdirSync(path.dirname(publicationsHtmlFile), { recursive: true });
     fs.writeFileSync(publicationsHtmlFile, publicationsRawHtml, 'utf-8');
 
     // Also build a copy at /articles/index.html to satisfy fallback endpoints
     const articlesHtmlFile = path.join(distPath, 'articles', 'index.html');
-    ensureDirectoryExistence(articlesHtmlFile);
+    fs.mkdirSync(path.dirname(articlesHtmlFile), { recursive: true });
     fs.writeFileSync(articlesHtmlFile, publicationsRawHtml, 'utf-8');
 
     // ============================================================
