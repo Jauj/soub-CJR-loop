@@ -747,7 +747,7 @@ function MainApp() {
         <meta name="description" content={seoData.description} />
         <meta name="keywords" content={seoData.keywords} />
         <link rel="canonical" href={seoData.canonicalUrl} />
-        <meta name="robots" content={ongletActif === 'Admin' ? 'noindex, follow' : 'index, follow'} />
+        <meta name="robots" content={ongletActif === 'Admin' ? 'noindex, nofollow' : 'index, follow'} />
 
         {/* Open Graph */}
         <meta property="og:title" content={seoData.title} />

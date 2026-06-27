@@ -18,7 +18,7 @@ function ensureDirectoryExistence(filePath) {
 // Simple and robust regex-based Markdown to HTML parser
 function parseMarkdownToHtml(markdown) {
   if (!markdown) return '';
-  
+
   let html = markdown
     // Escape HTML special characters
     .replace(/&/g, '&amp;')
@@ -37,7 +37,7 @@ function parseMarkdownToHtml(markdown) {
 
   // Parse Blockquotes (lines starting with >)
   html = html.replace(/^\s*&gt;\s+(.*?)$/gm, '<blockquote>$1</blockquote>');
-  
+
   // Merge consecutive blockquotes
   html = html.replace(/<\/blockquote>\n<blockquote>/g, '<br />');
 
@@ -100,9 +100,122 @@ function generateSlug(titre) {
     .substring(0, 60);
 }
 
+// ============================================================
+// NOUVEAU : Generation JSON-LD
+// ============================================================
+
+function generateArticleJsonLd(article, slug) {
+  const imgMatch = (article.contenuComplet || '').match(/!\[.*?\]\((.*?)\)/);
+  const imageUrl = imgMatch ? imgMatch[1] : `${BASE_URL}/logo-cjr.jpg`;
+  const keywords = ["marxisme", "trotskysme", "front unique", "Rosa Luxemburg", "revolution", "critique sociale", "bolchevisme", "mouvement ouvrier"];
+  const articleKeywords = article.indexations ? article.indexations.map(i => i.terme).filter(Boolean) : [];
+  const allKeywords = [...keywords, ...articleKeywords].join(", ");
+
+  return JSON.stringify([
+    {
+      "@context": "https://schema.org",
+      "@type": "NewsArticle",
+      "headline": article.titre,
+      "description": article.extrait || '',
+      "image": [imageUrl],
+      "datePublished": article.date,
+      "keywords": allKeywords,
+      "author": {
+        "@type": "Organization",
+        "name": "Socialisme ou Barbarie",
+        "url": BASE_URL,
+        "logo": `${BASE_URL}/logo-cjr.jpg`
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "Socialisme ou Barbarie",
+        "logo": {
+          "@type": "ImageObject",
+          "url": `${BASE_URL}/logo-cjr.jpg`
+        }
+      },
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": `${BASE_URL}/article/${slug}`
+      }
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Accueil",
+          "item": BASE_URL
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Publications",
+          "item": `${BASE_URL}/publications`
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": article.titre,
+          "item": `${BASE_URL}/article/${slug}`
+        }
+      ]
+    }
+  ]);
+}
+
+function generateStaticPageJsonLd(pageName, pageUrl) {
+  const items = [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Accueil",
+      "item": BASE_URL
+    }
+  ];
+  if (pageName !== 'Accueil') {
+    items.push({
+      "@type": "ListItem",
+      "position": 2,
+      "name": pageName,
+      "item": pageUrl
+    });
+  }
+
+  return JSON.stringify([
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Socialisme ou Barbarie",
+      "url": BASE_URL,
+      "description": "Portail d'etudes et de combat du Cercle de Jeunes Revolutionnaires (CJR). Analyses approfondies sur le trotskysme, le front unique, le marxisme revolutionnaire et l'histoire de Socialisme ou Barbarie.",
+      "publisher": {
+        "@type": "Organization",
+        "name": "Socialisme ou Barbarie",
+        "logo": `${BASE_URL}/logo-cjr.jpg`
+      }
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": items
+    }
+  ]);
+}
+
 // Template wrapping function containing theme HTML
-function getHtmlWrapper(title, description, contentHtml, canonicalUrl) {
-  const metaDesc = cleanMetaDescription(description || 'Socialisme ou Barbarie - Cercle de Jeunes Révolutionnaires');
+// ============================================================
+// CORRECTION P0 : suppression de <script type="module" src="/src/Entree.tsx">
+// CORRECTION P1 : ajout du parametre jsonLd pour les donnees structurees
+// ============================================================
+function getHtmlWrapper(title, description, contentHtml, canonicalUrl, jsonLd = null) {
+  const metaDesc = cleanMetaDescription(description || 'Socialisme ou Barbarie - Cercle de Jeunes Revolutionnaires');
+  const jsonLdBlock = jsonLd
+    ? `\n    <script type="application/ld+json">${jsonLd}</script>`
+    : '';
+
   return `<!doctype html>
 <html lang="fr">
   <head>
@@ -110,11 +223,11 @@ function getHtmlWrapper(title, description, contentHtml, canonicalUrl) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${title} | Socialisme ou Barbarie</title>
     <meta name="description" content="${metaDesc}" />
-    <meta name="keywords" content="marxisme, trotskysme, front unique, Rosa Luxemburg, Socialisme ou Barbarie, CJR, révolution, marxisme révolutionnaire, lutte des classes, bolchevisme" />
+    <meta name="keywords" content="marxisme, trotskysme, front unique, Rosa Luxemburg, Socialisme ou Barbarie, CJR, revolution, marxisme revolutionnaire, lutte des classes, bolchevisme" />
     <meta name="robots" content="index, follow" />
     <link rel="icon" type="image/jpeg" href="/logo-cjr.jpg" />
     <link rel="canonical" href="${canonicalUrl}" />
-    
+
     <!-- Open Graph -->
     <meta property="og:type" content="article" />
     <meta property="og:url" content="${canonicalUrl}" />
@@ -127,11 +240,11 @@ function getHtmlWrapper(title, description, contentHtml, canonicalUrl) {
     <meta name="twitter:url" content="${canonicalUrl}" />
     <meta name="twitter:title" content="${title} | Socialisme ou Barbarie" />
     <meta name="twitter:description" content="${metaDesc}" />
-    <meta name="twitter:image" content="https://cjr-soub.fr/logo-cjr.jpg" />
+    <meta name="twitter:image" content="https://cjr-soub.fr/logo-cjr.jpg" />${jsonLdBlock}
 
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=Libre+Baskerville:italic&display=swap');
-      
+
       body {
         font-family: 'Inter', sans-serif;
         color: #111111;
@@ -293,16 +406,13 @@ function getHtmlWrapper(title, description, contentHtml, canonicalUrl) {
       <div class="container">
         <header>
           <a href="/" class="brand-title">Socialisme <span class="red-accent">ou</span> Barbarie</a>
-          <a href="/publications" class="btn-back" style="margin: 0; padding: 6px 15px;">Dernières publications</a>
+          <a href="/publications" class="btn-back" style="margin: 0; padding: 6px 15px;">Dernieres publications</a>
         </header>
-        
+
         ${contentHtml}
-        
+
       </div>
     </div>
-    
-    <!-- React hydration script to boot client-side experience -->
-    <script type="module" src="/src/Entree.tsx"></script>
   </body>
 </html>`;
 }
@@ -312,13 +422,13 @@ function fetchFirestoreArticles() {
   return new Promise((resolve, reject) => {
     // REST API url syntax inside default databases
     const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/articles`;
-    
+
     https.get(url, (res) => {
       let data = '';
       res.on('data', (chunk) => {
         data += chunk;
       });
-      
+
       res.on('end', () => {
         try {
           const parsed = JSON.parse(data);
@@ -326,16 +436,16 @@ function fetchFirestoreArticles() {
             reject(new Error(parsed.error.message || 'Error fetching articles'));
             return;
           }
-          
+
           if (!parsed.documents) {
             resolve([]);
             return;
           }
-          
+
           // Map REST response elements back to standard structures
           const articles = parsed.documents.map(doc => {
             const fields = doc.fields || {};
-            
+
             // Extract indexations
             let indexations = [];
             if (fields.indexations && fields.indexations.arrayValue && fields.indexations.arrayValue.values) {
@@ -360,7 +470,7 @@ function fetchFirestoreArticles() {
               indexations: indexations
             };
           });
-          
+
           resolve(articles);
         } catch (e) {
           reject(e);
@@ -374,33 +484,120 @@ function fetchFirestoreArticles() {
 
 // Main compiler runner
 async function buildSEO() {
-  console.log('🚀 Démarrage de la génération statique SEO compatible plan Spark...');
-  
+  console.log('🚀 Demarrage de la generation statique SEO...');
+
   try {
     const articles = await fetchFirestoreArticles();
-    console.log(`📚 Article(s) récupéré(s) : ${articles.length}`);
-    
+    console.log(`📚 Article(s) recupere(s) : ${articles.length}`);
+
     // Sort articles by date descending
     articles.sort((a, b) => new Date(b.date) - new Date(a.date));
-    
+
     // Ensure the output build directories exist inside dist
     const distPath = path.resolve('dist');
     if (!fs.existsSync(distPath)) {
       console.error('❌ Erreur : Dossier "dist/" absent. Veuillez lancer "vite build" en premier.');
       process.exit(1);
     }
-    
-    // -------------------------------------------------------------------------
+
+    // ============================================================
+    // 0. NOUVEAU : PRE-RENDU DES PAGES STATIQUES (/, /qui-sommes-nous, /liens)
+    //    Corrige le P0-2 : duplicate content sur pages SPA vides
+    //    Corrige le probleme de canonical URL incorrect sur les fallbacks
+    // ============================================================
+
+    // --- Homepage ---
+    console.log('   ✍️  Generation statique de : / (homepage)');
+    const latestArticles = articles.slice(0, 6);
+    let homepageContent = `
+      <h2 style="font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 8px;">Bulletin de liaison</h2>
+      <h1 style="margin-bottom: 40px; font-size: 40px; font-weight: 950; text-transform: uppercase;">Socialisme <span style="color: rgba(227, 36, 33, 1);">ou</span> Barbarie</h1>
+      <p style="font-family: 'Libre Baskerville', serif; font-style: italic; font-size: 20px; line-height: 1.6; color: #333; border-left: 6px solid rgba(227, 36, 33, 1); padding-left: 24px; margin: 0 0 40px 0;">
+        Cercle de Jeunes Revolutionnaires combattant pour le socialisme, pour la construction d'une Organisation Revolutionnaire de la jeunesse, d'une Internationale Revolutionnaire de la Jeunesse.
+      </p>
+      <h2 style="font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 16px;">Dernieres publications</h2>
+    `;
+    if (latestArticles.length > 0) {
+      latestArticles.forEach(article => {
+        const slug = article.slug || generateSlug(article.titre);
+        homepageContent += `
+          <div class="article-card">
+            <a href="/article/${slug}">
+              <div class="date-badge">${article.dateAffichee || article.date}</div>
+              <h2 style="font-weight: 900; text-transform: uppercase; font-size: 24px; margin: 8px 0;">${article.titre}</h2>
+              <p>${article.extrait || ""}</p>
+            </a>
+          </div>
+        `;
+      });
+      homepageContent += `<a href="/publications" class="btn-back">Voir toutes les publications</a>`;
+    } else {
+      homepageContent += `<p style="font-style: italic; color: #666;">Aucune publication pour le moment.</p>`;
+    }
+
+    const homepageHtml = getHtmlWrapper(
+      'Socialisme ou Barbarie',
+      'Bulletin de liaison du Cercle de Jeunes Revolutionnaires combattant pour le socialisme.',
+      homepageContent,
+      `${BASE_URL}/`,
+      generateStaticPageJsonLd('Accueil', BASE_URL)
+    );
+    fs.writeFileSync(path.join(distPath, 'index.html'), homepageHtml, 'utf-8');
+
+    // --- Qui sommes-nous ---
+    console.log('   ✍️  Generation statique de : /qui-sommes-nous');
+    const qsnContent = `
+      <h2 style="font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 8px;">Qui sommes-nous</h2>
+      <h1 style="margin-bottom: 30px;">Cercle de Jeunes Revolutionnaires</h1>
+      <div class="article-content">
+        <p>Le Cercle de Jeunes Revolutionnaires (CJR) est une organisation de jeunesse combattant pour le socialisme et la construction d'une Internationale Revolutionnaire de la Jeunesse.</p>
+        <p>Nous publions regulierement des analyses theoriques, des bulletins de liaison et des interventions militantes sur les enjeux politiques contemporains, ancrees dans la tradition du marxisme revolutionnaire et du trotskysme.</p>
+        <p>Nos travaux portent sur la lutte des classes, le front unique ouvrier, les mouvements de liberation nationale, la defense de l'environnement et la solidarite internationale.</p>
+      </div>
+      <a href="/publications" class="btn-back">Lire nos publications</a>
+    `;
+    const qsnHtml = getHtmlWrapper(
+      'Qui sommes-nous',
+      'Decouvrez le Cercle de Jeunes Revolutionnaires (CJR) - notre histoire, nos positions et notre combat pour le socialisme.',
+      qsnContent,
+      `${BASE_URL}/qui-sommes-nous`,
+      generateStaticPageJsonLd('Qui sommes-nous', `${BASE_URL}/qui-sommes-nous`)
+    );
+    const qsnDir = path.join(distPath, 'qui-sommes-nous');
+    ensureDirectoryExistence(qsnDir);
+    fs.writeFileSync(path.join(qsnDir, 'index.html'), qsnHtml, 'utf-8');
+
+    // --- Liens ---
+    console.log('   ✍️  Generation statique de : /liens');
+    const liensContent = `
+      <h2 style="font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 8px;">Ressources</h2>
+      <h1 style="margin-bottom: 30px;">Liens utiles</h1>
+      <div class="article-content">
+        <p>Retrouvez ici une selection de ressources et de liens vers des organisations, publications et outils militants en lien avec nos combats politiques.</p>
+      </div>
+    `;
+    const liensHtml = getHtmlWrapper(
+      'Liens utiles',
+      'Ressources et liens vers des organisations et publications militantes en lien avec le Cercle de Jeunes Revolutionnaires.',
+      liensContent,
+      `${BASE_URL}/liens`,
+      generateStaticPageJsonLd('Liens utiles', `${BASE_URL}/liens`)
+    );
+    const liensDir = path.join(distPath, 'liens');
+    ensureDirectoryExistence(liensDir);
+    fs.writeFileSync(path.join(liensDir, 'index.html'), liensHtml, 'utf-8');
+
+    // ============================================================
     // 1. GENERATE STATIC INDIVIDUAL ARTICLE PAGES
-    // -------------------------------------------------------------------------
+    // ============================================================
     for (const article of articles) {
       const slug = article.slug || generateSlug(article.titre);
       const outputPageFile = path.join(distPath, 'article', `${slug}.html`);
-      
-      console.log(`   ✍️  Génération statique de : /article/${slug}`);
-      
+
+      console.log(`   ✍️  Generation statique de : /article/${slug}`);
+
       const parsedMarkdownHTML = parseMarkdownToHtml(article.contenuComplet || '');
-      
+
       let indexationHtml = '';
       if (article.indexations && article.indexations.length > 0) {
         indexationHtml = `<div class="indexation">`;
@@ -409,56 +606,60 @@ async function buildSEO() {
         });
         indexationHtml += `</div>`;
       }
-      
+
       const articleBodyHtml = `
         <article>
           <span class="date-badge">${article.dateAffichee || article.date}</span>
           <h1 style="color: #000; font-weight: 900;">${article.titre}</h1>
           ${article.extrait ? `<div class="chapo">${article.extrait}</div>` : ''}
-          
+
           <div class="article-content">
             ${parsedMarkdownHTML}
           </div>
-          
+
           ${indexationHtml}
-          
+
           <div style="margin-top: 60px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
             <a href="/publications" class="btn-back" style="margin: 0;">← Toutes les publications</a>
-            ${article.pdfUrl ? `<a href="${article.pdfUrl}" target="_blank" rel="noopener noreferrer" class="btn-back" style="margin: 0; background-color: rgba(227, 36, 33, 1); border-color: rgba(227, 36, 33, 1);">Télécharger la version PDF </a>` : ''}
+            ${article.pdfUrl ? `<a href="${article.pdfUrl}" target="_blank" rel="noopener noreferrer" class="btn-back" style="margin: 0; background-color: rgba(227, 36, 33, 1); border-color: rgba(227, 36, 33, 1);">Telecharger la version PDF </a>` : ''}
           </div>
         </article>
       `;
-      
+
+      // CORRECTION P1 : injection du JSON-LD dans le HTML statique
+      const jsonLd = generateArticleJsonLd(article, slug);
+
       const rawHtml = getHtmlWrapper(
         article.titre,
         article.extrait || article.contenuComplet,
         articleBodyHtml,
-        `${BASE_URL}/article/${slug}`
+        `${BASE_URL}/article/${slug}`,
+        jsonLd
       );
-      
+
       ensureDirectoryExistence(outputPageFile);
       fs.writeFileSync(outputPageFile, rawHtml, 'utf-8');
     }
-    
-    // -------------------------------------------------------------------------
+
+    // ============================================================
     // 2. GENERATE STATIC INDEX PUBLICATIONS PAGE
-    // -------------------------------------------------------------------------
+    // ============================================================
     const publicationsHtmlFile = path.join(distPath, 'publications', 'index.html');
-    console.log('   ✍️  Génération statique de : /publications');
-    
+    console.log('   ✍️  Generation statique de : /publications');
+
     let listHtml = `
       <h2 style="font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 8px;">Bulletins de liaison</h2>
-      <h1 style="margin-bottom: 40px; font-size: 40px; font-weight: 950; text-transform: uppercase;">Analyses & Thèses Militantes</h1>
+      <h1 style="margin-bottom: 40px; font-size: 40px; font-weight: 950; text-transform: uppercase;">Analyses & Theses Militantes</h1>
       <div class="articles-grid">
     `;
-    
+
     if (articles.length === 0) {
-      listHtml += `<p style="font-style: italic; color: #666;">Aucune analyse publiée pour le moment.</p>`;
+      listHtml += `<p style="font-style: italic; color: #666;">Aucune analyse publiee pour le moment.</p>`;
     } else {
       articles.forEach(article => {
         const slug = article.slug || generateSlug(article.titre);
         const articleUrl = `/article/${slug}`;
-        
+
         listHtml += `
           <div class="article-card">
             <a href="${articleUrl}">
@@ -471,28 +672,30 @@ async function buildSEO() {
       });
     }
     listHtml += `</div>`;
-    
+
     const publicationsRawHtml = getHtmlWrapper(
-      "Analyses, Thèses & Archives",
-      "Retrouvez l'index complet de toutes nos publications, analyses théoriques et bulletins de liaison du Cercle de Jeunes Révolutionnaires.",
+      "Analyses, Theses & Archives",
+      "Retrouvez l'index complet de toutes nos publications, analyses theoriques et bulletins de liaison du Cercle de Jeunes Revolutionnaires.",
       listHtml,
-      `${BASE_URL}/publications`
+      `${BASE_URL}/publications`,
+      generateStaticPageJsonLd('Publications', `${BASE_URL}/publications`)
     );
-    
+
     ensureDirectoryExistence(publicationsHtmlFile);
     fs.writeFileSync(publicationsHtmlFile, publicationsRawHtml, 'utf-8');
-    
+
     // Also build a copy at /articles/index.html to satisfy fallback endpoints
     const articlesHtmlFile = path.join(distPath, 'articles', 'index.html');
     ensureDirectoryExistence(articlesHtmlFile);
     fs.writeFileSync(articlesHtmlFile, publicationsRawHtml, 'utf-8');
 
-    // -------------------------------------------------------------------------
+    // ============================================================
     // 3. GENERATE DYNAMIC SITEMAP.XML
-    // -------------------------------------------------------------------------
+    //    CORRECTION MINEUR N°6 : sitemap coherent (pas de /index)
+    // ============================================================
     const sitemapFile = path.join(distPath, 'sitemap.xml');
-    console.log('   ✍️  Génération statique de : /sitemap.xml');
-    
+    console.log('   ✍️  Generation statique de : /sitemap.xml');
+
     const staticRoutes = [
       { path: '/', priority: '1.0', changefreq: 'daily' },
       { path: '/publications', priority: '0.9', changefreq: 'daily' },
@@ -516,7 +719,7 @@ async function buildSEO() {
     articles.forEach(article => {
       const slug = article.slug || generateSlug(article.titre);
       const articleUrl = `${BASE_URL}/article/${slug}`;
-      
+
       let lastMod = new Date().toISOString().split('T')[0];
       if (article.date) {
         try {
@@ -536,13 +739,13 @@ async function buildSEO() {
     });
 
     xml += `</urlset>\n`;
-    
+
     fs.writeFileSync(sitemapFile, xml, 'utf-8');
-    
-    console.log('✅ Génération statique SEO terminée avec succès ! Aucun cloud package requis.');
-    
+
+    console.log('✅ Generation statique SEO terminee avec succes !');
+
   } catch (error) {
-    console.error('❌ Une erreur est survenue lors du pré-rendu SEO :', error);
+    console.error('❌ Une erreur est survenue lors du pre-rendu SEO :', error);
     process.exit(1);
   }
 }
