@@ -3,16 +3,19 @@
     "site": "cjr-soub",
     "public": "dist",
     "cleanUrls": true,
+    "trailingSlash": false,
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
     ],
+    "redirects": [
+      { "source": "/index", "destination": "/index-thematique", "type": 301 },
+      { "source": "/articles", "destination": "/publications", "type": 301 }
+    ],
     "rewrites": [
-      {
-        "source": "/admin",
-        "destination": "/index.html"
-      }
+      { "source": "/admin", "destination": "/app-shell.html" },
+      { "source": "/article/**", "destination": "/app-shell.html" }
     ]
   },
   "firestore": {

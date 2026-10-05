@@ -4,6 +4,10 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+  # Filet de sécurité : régénère pages SEO et sitemap chaque nuit (articles
+  # modifiés/supprimés sans que le webhook de l'admin ait abouti).
+  schedule:
+    - cron: '17 3 * * *'
 
 jobs:
   build_and_deploy:

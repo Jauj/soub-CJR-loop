@@ -24,6 +24,10 @@ import { auth, googleProvider, signInWithPopup, signOut, signInWithEmailAndPassw
 import { onAuthStateChanged } from 'firebase/auth';
 import { useAuth } from './hooks/useAuth';
 import { useAppData } from './hooks/useAppData';
+import { SITE_NAME, PAGES, canonicalUrl, articleSeo, pageSeo } from './seo/shared.js';
+
+// Anciennes URL encore servies par l'application (redirigées en 301 par firebase.json)
+const PAGE_ALIASES: Record<string, string> = { '/index': '/index-thematique', '/articles': '/publications' };
 
 const COULEUR_ROUGE = 'rgba(227, 36, 33, 1)';
 
@@ -204,6 +208,7 @@ export default function Application() {
           <Routes>
             <Route path="/" element={<MainApp />} />
             <Route path="/publications" element={<MainApp />} />
+            <Route path="/index-thematique" element={<MainApp />} />
             <Route path="/index" element={<MainApp />} />
             <Route path="/liens" element={<MainApp />} />
             <Route path="/qui-sommes-nous" element={<MainApp />} />
@@ -289,139 +294,36 @@ function MainApp() {
     return !!params.slug && !isDataLoading && !articleSelectionne;
   }, [params.slug, isDataLoading, articleSelectionne]);
 
-  // --- GESTION DES DONNÉES STRUCTURÉES (JSON-LD) ---
-  const structuredData = useMemo(() => {
-    const brand = "Socialisme ou Barbarie";
-    const urlBase = "https://cjr-soub.fr/";
-    const keywords = ["marxisme", "trotskysme", "front unique", "Rosa Luxemburg", "révolution", "critique sociale", "bolchevisme", "mouvement ouvrier"];
-
-    const breadcrumbs = {
-      "@context": "https://schema.org",
-      "@type": "BreadcrumbList",
-      "itemListElement": [
-        {
-          "@type": "ListItem",
-          "position": 1,
-          "name": "Accueil",
-          "item": urlBase
-        },
-        ongletActif !== 'Accueil' && {
-          "@type": "ListItem",
-          "position": 2,
-          "name": ongletActif,
-          "item": `${urlBase}${location.pathname.substring(1)}`
-        }
-      ].filter(Boolean)
-    };
-
-    if (articleSelectionne) {
-      const imgMatch = articleSelectionne.contenuComplet.match(/!\[.*?\]\((.*?)\)/);
-      const imageUrl = imgMatch ? imgMatch[1] : `${urlBase}logo-cjr.jpg`;
-
-      return [
-        {
-          "@context": "https://schema.org",
-          "@type": "NewsArticle",
-          "headline": articleSelectionne.titre,
-          "description": articleSelectionne.extrait,
-          "image": [imageUrl],
-          "datePublished": articleSelectionne.date,
-          "keywords": [...keywords, ...(articleSelectionne.indexations?.map(i => i.terme) || [])].join(", "),
-          "author": {
-            "@type": "Organization",
-            "name": brand,
-            "url": urlBase,
-            "logo": `${urlBase}logo-cjr.jpg`
-          },
-          "publisher": {
-            "@type": "Organization",
-            "name": brand,
-            "logo": {
-              "@type": "ImageObject",
-              "url": `${urlBase}logo-cjr.jpg`
-            }
-          },
-          "mainEntityOfPage": {
-            "@type": "WebPage",
-            "@id": `${urlBase}article/${articleSelectionne.slug || articleSelectionne.id}`
-          }
-        },
-        breadcrumbs
-      ];
-    } else {
-      return [
-        {
-          "@context": "https://schema.org",
-          "@type": "WebSite",
-          "name": brand,
-          "url": urlBase,
-          "description": "Portail d'études et de combat du Cercle de Jeunes Révolutionnaires (CJR). Analyses approfondies sur le trotskysme, le front unique, le marxisme révolutionnaire et l'histoire de Socialisme ou Barbarie.",
-          "keywords": keywords.join(", "),
-          "publisher": {
-            "@type": "Organization",
-            "name": brand,
-            "logo": `${urlBase}logo-cjr.jpg`,
-            "knowsAbout": keywords
-          }
-        },
-        breadcrumbs
-      ];
+  // Ancienne URL d'article (id Firestore) -> URL canonique par slug
+  useEffect(() => {
+    if (articleSelectionne?.slug && params.slug !== articleSelectionne.slug) {
+      navigate(`/article/${articleSelectionne.slug}`, { replace: true });
     }
-  }, [articleSelectionne, ongletActif, location.pathname]);
+  }, [articleSelectionne, params.slug, navigate]);
 
-  // --- GESTION DU TITRE ET DE LA META DESCRIPTION (SEO) ---
+  // --- SEO : mêmes balises que le pré-rendu statique (src/seo/shared.js) ---
   const seoData = useMemo(() => {
-    const brand = "Socialisme ou Barbarie";
-    const baseKeywords = "Cercle de Jeunes Révolutionnaires, CJR, trotskysme, marxisme, Rosa Luxemburg, front unique, révolution, organisation révolutionnaire, Socialisme ou Barbarie, lutte des classes";
-    const baseUrl = "https://cjr-soub.fr"; // Sans slash final pour cohérence
-    
-    let title = brand;
-    let description = "Bulletin de liaison du Cercle de Jeunes Révolutionnaires combattant pour le socialisme, pour la construction d'une Organisations Révolutionnaire de la jeunesse, d'une Internationale Révolutionnaire de la Jeunesse";
-    let canonicalUrl = baseUrl + "/"; // Racine finit par / par convention
-    let type = "website";
-
+    const path = location.pathname.replace(/\/+$/, '') || '/';
     if (articleSelectionne) {
-      title = `${articleSelectionne.titre} | ${brand}`;
-      description = articleSelectionne.extrait.length > 155 
-        ? articleSelectionne.extrait.substring(0, 152) + "..." 
-        : articleSelectionne.extrait;
-      canonicalUrl = `${baseUrl}/article/${articleSelectionne.slug || articleSelectionne.id}`;
-      type = "article";
-    } else {
-      switch (ongletActif) {
-        case 'Accueil':
-          title = `${brand} | Cercle de Jeunes Révolutionnaires`;
-          canonicalUrl = baseUrl + "/";
-          break;
-        case 'Publications':
-          title = `Analyses & Thèses | ${brand}`;
-          description = `Découvrez les thèses du CJR sur le trotskysme, le marxisme et le front unique. Un fonds documentaire de combat pour la jeunesse révolutionnaire.`;
-          canonicalUrl = `${baseUrl}/publications`;
-          break;
-        case 'Index':
-          title = `Index Thématique (Marxisme, Trotskysme) | ${brand}`;
-          description = "Naviguez par concepts : Front Unique, Dualité de pouvoir, Dialectique, Rosa Luxemburg. Le lexique de la révolution.";
-          canonicalUrl = `${baseUrl}/index`;
-          break;
-        case 'Liens':
-          title = `Ressources Révolutionnaires | ${brand}`;
-          description = "Liens vers les archives marxistes, le projet Trotsky et les organisations sœurs pour la construction de l'Internationale.";
-          canonicalUrl = `${baseUrl}/liens`;
-          break;
-        case 'Qui sommes nous ?':
-          title = `Projet & Combat du CJR | ${brand}`;
-          description = "Histoire et objectifs du Cercle de Jeunes Révolutionnaires. Notre lien avec Socialisme ou Barbarie et la Quatrième Internationale.";
-          canonicalUrl = `${baseUrl}/qui-sommes-nous`;
-          break;
-      }
+      return { ...articleSeo(articleSelectionne), indexable: true };
     }
-
-    const imgMatch = articleSelectionne?.contenuComplet.match(/!\[.*?\]\((.*?)\)/);
-    const imageUrl = imgMatch ? imgMatch[1] : `${baseUrl}/logo-cjr.jpg`;
-    const finalKeywords = baseKeywords + (articleSelectionne ? `, ${articleSelectionne.indexations?.map(i => i.terme).join(", ")}` : '');
-
-    return { title, description, canonicalUrl, type, imageUrl, keywords: finalKeywords };
-  }, [articleSelectionne, ongletActif, location.pathname]);
+    if (params.slug) {
+      // Article en cours de chargement (ou introuvable) : canonique tirée de l'URL
+      return {
+        ...pageSeo('/'),
+        title: isArticleNotFound ? `Article introuvable | ${SITE_NAME}` : SITE_NAME,
+        canonical: canonicalUrl(`/article/${params.slug}`),
+        jsonLd: [],
+        indexable: !isArticleNotFound,
+      };
+    }
+    const page = PAGE_ALIASES[path] || path;
+    if (PAGES[page as keyof typeof PAGES]) {
+      return { ...pageSeo(page), indexable: true };
+    }
+    // /admin et chemins inconnus : jamais indexés
+    return { ...pageSeo('/'), indexable: false };
+  }, [articleSelectionne, params.slug, isArticleNotFound, location.pathname]);
 
   const handleLogin = async (password: string) => {
     setLoginError(null);
@@ -605,7 +507,7 @@ function MainApp() {
               const pathMap: Record<string, string> = {
                 'Accueil': '/',
                 'Publications': '/publications',
-                'Index': '/index',
+                'Index': '/index-thematique',
                 'Liens': '/liens',
                 'Qui sommes nous ?': '/qui-sommes-nous',
                 'Admin': '/admin'
@@ -746,26 +648,31 @@ function MainApp() {
         <title>{seoData.title}</title>
         <meta name="description" content={seoData.description} />
         <meta name="keywords" content={seoData.keywords} />
-        <link rel="canonical" href={seoData.canonicalUrl} />
-        <meta name="robots" content={ongletActif === 'Admin' ? 'noindex, nofollow' : 'index, follow'} />
+        <link rel="canonical" href={seoData.canonical} />
+        <meta name="robots" content={seoData.indexable ? 'index, follow' : 'noindex, follow'} />
 
         {/* Open Graph */}
+        <meta property="og:site_name" content={SITE_NAME} />
+        <meta property="og:locale" content="fr_FR" />
         <meta property="og:title" content={seoData.title} />
         <meta property="og:description" content={seoData.description} />
-        <meta property="og:url" content={seoData.canonicalUrl} />
+        <meta property="og:url" content={seoData.canonical} />
         <meta property="og:type" content={seoData.type} />
-        <meta property="og:image" content={seoData.imageUrl} />
+        <meta property="og:image" content={seoData.image} />
 
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:url" content={seoData.canonical} />
         <meta name="twitter:title" content={seoData.title} />
         <meta name="twitter:description" content={seoData.description} />
-        <meta name="twitter:image" content={seoData.imageUrl} />
+        <meta name="twitter:image" content={seoData.image} />
 
         {/* Données Structurées JSON-LD */}
-        <script type="application/ld+json">
-          {JSON.stringify(structuredData)}
-        </script>
+        {seoData.jsonLd.length > 0 && (
+          <script type="application/ld+json">
+            {JSON.stringify(seoData.jsonLd)}
+          </script>
+        )}
       </Helmet>
 
       {/* En-tête Mobile avec Burger */}
