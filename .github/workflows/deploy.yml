@@ -4,13 +4,49 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
-  # Filet de sécurité : régénère pages SEO et sitemap chaque nuit (articles
-  # modifiés/supprimés sans que le webhook de l'admin ait abouti).
+  # Toutes les 15 min : reconstruit le site (pages SEO + sitemap) si les articles
+  # Firestore ont changé (publication, modification, suppression dans l'admin).
   schedule:
-    - cron: '17 3 * * *'
+    - cron: '*/15 * * * *'
+
+# Jamais deux déploiements en parallèle
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
 
 jobs:
+  check_articles:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Compare Firestore articles with live site
+        id: check
+        run: node scripts/check-articles.js
+
+      # GitHub désactive les tâches planifiées d'un dépôt public sans activité
+      # depuis 60 jours : la réactiver remet ce compteur à zéro.
+      - name: Keep scheduled workflow enabled
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/deploy.yml/enable"
+
   build_and_deploy:
+    needs: check_articles
+    if: ${{ !cancelled() && (github.event_name != 'schedule' || needs.check_articles.outputs.changed == 'true') }}
     runs-on: ubuntu-latest
 
     steps:

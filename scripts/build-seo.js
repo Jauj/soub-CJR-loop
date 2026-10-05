@@ -12,8 +12,7 @@ import path from 'path';
 import {
   BASE_URL, SITE_NAME, PAGES, canonicalUrl, articleSlug, articleSeo, pageSeo,
 } from '../src/seo/shared.js';
-
-const PROJECT_ID = 'cjr-soub';
+import { fetchArticles, articlesFingerprint, FINGERPRINT_FILE } from './articles.js';
 const DIST = path.resolve('dist');
 
 const escapeHtml = (value) => String(value ?? '')
@@ -71,40 +70,6 @@ function writePage(urlPath, html) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, html, 'utf-8');
   console.log(`   ✍️  ${urlPath}`);
-}
-
-// --- Lecture des articles (API REST Firestore publique, avec pagination) ---
-
-function fromFirestoreValue(value) {
-  if (!value) return undefined;
-  if ('stringValue' in value) return value.stringValue;
-  if ('integerValue' in value) return Number(value.integerValue);
-  if ('doubleValue' in value) return value.doubleValue;
-  if ('booleanValue' in value) return value.booleanValue;
-  if ('arrayValue' in value) return (value.arrayValue.values || []).map(fromFirestoreValue);
-  if ('mapValue' in value) {
-    return Object.fromEntries(Object.entries(value.mapValue.fields || {}).map(([k, v]) => [k, fromFirestoreValue(v)]));
-  }
-  return undefined;
-}
-
-async function fetchArticles() {
-  const articles = [];
-  let pageToken = '';
-  do {
-    const url = new URL(`https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/articles`);
-    url.searchParams.set('pageSize', '300');
-    if (pageToken) url.searchParams.set('pageToken', pageToken);
-    const res = await fetch(url);
-    const body = await res.json();
-    if (!res.ok || body.error) throw new Error(body.error?.message || `HTTP ${res.status}`);
-    for (const doc of body.documents || []) {
-      const fields = Object.fromEntries(Object.entries(doc.fields || {}).map(([k, v]) => [k, fromFirestoreValue(v)]));
-      articles.push({ id: doc.name.split('/').pop(), ...fields });
-    }
-    pageToken = body.nextPageToken || '';
-  } while (pageToken);
-  return articles;
 }
 
 // --- Sitemap ---
@@ -174,6 +139,9 @@ async function buildSEO() {
   }
 
   fs.writeFileSync(path.join(DIST, 'sitemap.xml'), buildSitemap(uniqueArticles), 'utf-8');
+  // Empreinte lue par scripts/check-articles.js (déploiement planifié)
+  fs.writeFileSync(path.join(DIST, FINGERPRINT_FILE), `${articlesFingerprint(articles)}
+`, 'utf-8');
   console.log(`   🗺️  sitemap.xml (${Object.keys(PAGES).length + uniqueArticles.length} URL, ${BASE_URL})`);
   console.log('✅ Génération statique SEO terminée');
 }

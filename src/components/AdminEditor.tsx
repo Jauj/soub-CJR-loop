@@ -107,21 +107,11 @@ export default function AdminEditor({ articleToEdit, categories, articles = [], 
         ...articleData,
         id: articleToEdit?.id
       });
-      toast.success("Article enregistré avec succès !");
-
-      // Déclencher le rebuild et le déploiement automatique
-      try {
-        await fetch("https://deploy-webhook-cjr.vercel.app/api/trigger-deploy", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer CJRsecret2026"  // ⚠️ Remplacez par votre vrai secret partagé
-          },
-          body: JSON.stringify({})
-        });
-      } catch (webhookError) {
-        console.error("Erreur webhook (déploiement non déclenché) :", webhookError);
-      }
+      // Les pages SEO et le sitemap sont régénérés par le déploiement planifié
+      // (.github/workflows/deploy.yml, vérification des articles toutes les 15 min).
+      toast.success("Article enregistré avec succès !", {
+        description: "Pages de référencement et sitemap mis à jour d'ici 15 à 20 minutes."
+      });
 
       onClose();
     } catch (error: any) {
