@@ -140,7 +140,17 @@ service cloud.firestore {
       return hasRequiredFields(['email', 'dateInscription']) &&
              data.email is string && data.email.size() < 128 &&
              data.email.matches("^[^@]+@[^@]+\\.[^@]+$") &&
-             data.dateInscription is string;
+             data.dateInscription is string && data.dateInscription.size() <= 40;
+    }
+
+    // Inscription publique : id du document = e-mail en minuscules (anti-doublons
+    // sans avoir besoin de lister la collection).
+    function isValidPublicSubscription(subscriberId) {
+      let data = request.resource.data;
+      return isValidSubscriber() &&
+             hasOnlyAllowedFields(['email', 'dateInscription']) &&
+             data.email == data.email.lower() &&
+             subscriberId == data.email;
     }
 
     function isValidNewsletter() {
@@ -183,9 +193,9 @@ service cloud.firestore {
     }
 
     match /subscribers/{subscriberId} {
+      // Lecture (get + list) réservée aux admins : les e-mails ne sont pas publics.
       allow read: if isAdmin();
-      allow list: if true;
-      allow create: if isValidSubscriber();
+      allow create: if isValidPublicSubscription(subscriberId) || (isAdmin() && isValidSubscriber());
       allow update: if isAdmin() && isValidSubscriber();
       allow delete: if isAdmin();
     }

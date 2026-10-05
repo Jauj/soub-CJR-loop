@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { auth } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-
-const ADMIN_EMAILS = ["ferrierjonas@gmail.com", "cjr.soub@gmail.com", "admin@cjr.fr"];
+import { isAdminUser } from '../config/admins';
 
 export const useAuth = () => {
   const [user, setUser] = useState(auth.currentUser);
@@ -15,7 +14,7 @@ export const useAuth = () => {
     });
   }, []);
 
-  const isAdmin = user && user.email && (user.emailVerified || user.email === "admin@cjr.fr") && ADMIN_EMAILS.includes(user.email);
+  const isAdmin = isAdminUser(user);
 
   return {
     user,

@@ -2,15 +2,16 @@ import {
   collection, 
   getDocs, 
   addDoc, 
+  setDoc,
   updateDoc, 
   deleteDoc, 
   doc, 
   query, 
-  orderBy,
-  where
+  orderBy
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { Subscriber, Newsletter } from '../types';
+import { isAdminUser } from '../config/admins';
 
 enum OperationType {
   CREATE = 'create',
@@ -20,8 +21,6 @@ enum OperationType {
   GET = 'get',
   WRITE = 'write',
 }
-
-const ADMIN_EMAILS = ["ferrierjonas@gmail.com", "cjr.soub@gmail.com", "admin@cjr.fr"];
 
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errInfo = {
@@ -55,35 +54,37 @@ async function executeFirestore<T>(
 }
 
 const checkAdmin = () => {
-  const user = auth.currentUser;
-  if (!user || !user.email || (user.email !== "admin@cjr.fr" && !user.emailVerified) || !ADMIN_EMAILS.includes(user.email)) {
+  if (!isAdminUser(auth.currentUser)) {
     throw new Error("Accès non autorisé. Veuillez vous connecter avec un compte administrateur.");
   }
 };
 
 // --- SUBSCRIBERS ---
 
+/**
+ * Inscription publique. L'identifiant du document est l'e-mail normalisé :
+ * le public ne peut que créer (pas lire ni lister, cf. firestore.rules), donc
+ * une réinscription est une mise à jour refusée => traitée comme « déjà abonné ».
+ */
 export const subscribeNewsletter = async (email: string) => {
   const path = "subscribers";
-  return executeFirestore(async () => {
-    // Tenter de vérifier si déjà abonné (risqué si permissions strictes)
-    try {
-      const q = query(collection(db, path), where("email", "==", email));
-      const snapshot = await getDocs(q);
-      if (!snapshot.empty) {
-        return { success: true, message: "Déjà abonné !" };
-      }
-    } catch (e) {
-      // On ignore l'erreur de permission pour le check car public n'a pas le droit de LIST
-      // On procède directement à l'ajout.
-    }
-
-    await addDoc(collection(db, path), {
-      email,
+  const normalized = email.trim().toLowerCase();
+  if (!/^[^@\s/]+@[^@\s/]+\.[^@\s/]+$/.test(normalized) || normalized.length >= 128) {
+    throw new Error("Adresse e-mail invalide");
+  }
+  try {
+    await setDoc(doc(db, path, normalized), {
+      email: normalized,
       dateInscription: new Date().toISOString()
     });
     return { success: true };
-  }, OperationType.WRITE, path);
+  } catch (error) {
+    if ((error as { code?: string })?.code === 'permission-denied') {
+      return { success: true, message: "Déjà abonné !" };
+    }
+    handleFirestoreError(error, OperationType.CREATE, path);
+    throw error;
+  }
 };
 
 export const fetchSubscribers = async (): Promise<Subscriber[]> => {
