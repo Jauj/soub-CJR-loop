@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { Article, LienRessource } from '../types';
+import { isAdminUser } from '../config/admins';
 
 enum OperationType {
   CREATE = 'create',
@@ -81,8 +82,6 @@ async function executeFirestore<T>(
   }
 }
 
-const ADMIN_EMAILS = ["ferrierjonas@gmail.com", "cjr.soub@gmail.com", "admin@cjr.fr"];
-
 /**
  * Génère un slug SEO-friendly à partir d'un titre.
  */
@@ -99,8 +98,7 @@ export const generateSlug = (titre: string): string => {
 };
 
 const checkAuth = () => {
-  const user = auth.currentUser;
-  if (!user || !user.email || (user.email !== "admin@cjr.fr" && !user.emailVerified) || !ADMIN_EMAILS.includes(user.email)) {
+  if (!isAdminUser(auth.currentUser)) {
     throw new Error("Accès non autorisé. Veuillez vous connecter avec un compte administrateur.");
   }
 };
