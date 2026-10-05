@@ -14,6 +14,7 @@ import {
 import { db, auth } from '../firebase';
 import { Article, LienRessource } from '../types';
 import { isAdminUser } from '../config/admins';
+import { generateSlug, articleSlug } from '../seo/shared.js';
 
 enum OperationType {
   CREATE = 'create',
@@ -82,20 +83,8 @@ async function executeFirestore<T>(
   }
 }
 
-/**
- * Génère un slug SEO-friendly à partir d'un titre.
- */
-export const generateSlug = (titre: string): string => {
-  return titre
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // Supprime les accents
-    .replace(/[^a-z0-9\s-]/g, "") // Supprime les caractères spéciaux
-    .trim()
-    .replace(/\s+/g, "-") // Remplace les espaces par des tirets
-    .replace(/-+/g, "-") // Évite les tirets multiples
-    .substring(0, 60); // Limite la longueur pour le SEO
-};
+// Slug partagé avec scripts/build-seo.js (une seule implémentation).
+export { generateSlug };
 
 const checkAuth = () => {
   if (!isAdminUser(auth.currentUser)) {
@@ -108,10 +97,11 @@ export const getArticles = async (): Promise<Article[]> => {
   return executeFirestore(async () => {
     const q = query(collection(db, path), orderBy("date", "desc"));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Article));
+    return snapshot.docs.map(doc => {
+      const article = { id: doc.id, ...doc.data() } as Article;
+      // Les anciens articles sans slug reçoivent le même slug que leur page statique.
+      return { ...article, slug: articleSlug(article) };
+    });
   }, OperationType.LIST, path);
 };
 

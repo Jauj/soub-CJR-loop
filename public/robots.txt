@@ -1,5 +1,6 @@
 User-agent: *
 Allow: /
 Disallow: /admin
+Disallow: /app-shell
 
 Sitemap: https://cjr-soub.fr/sitemap.xml
