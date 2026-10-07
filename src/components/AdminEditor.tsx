@@ -9,6 +9,11 @@ import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import { toast } from 'sonner';
 
+// Limites imposées par isValidArticle() dans firestore.rules.
+const MAX_TITRE = 200;
+const MAX_EXTRAIT = 5000;
+const MAX_CONTENU = 100000;
+
 interface AdminEditorProps {
   articleToEdit?: Article | null;
   categories: { id: string, nom: string, ordre: number }[];
@@ -90,6 +95,18 @@ export default function AdminEditor({ articleToEdit, categories, articles = [], 
       return;
     }
 
+    // Mêmes limites que isValidArticle() dans firestore.rules : sinon Firestore
+    // refuse l'écriture avec un simple « permissions insuffisantes ».
+    const depassement = [
+      titre.trim().length >= MAX_TITRE && `le titre (${titre.trim().length}/${MAX_TITRE - 1} caractères)`,
+      extrait.trim().length > MAX_EXTRAIT && `le chapô (${extrait.trim().length}/${MAX_EXTRAIT} caractères)`,
+      contenuComplet.trim().length > MAX_CONTENU && `le contenu (${contenuComplet.trim().length}/${MAX_CONTENU} caractères)`,
+    ].filter(Boolean);
+    if (depassement.length) {
+      toast.error(`Trop long : ${depassement.join(', ')}.`);
+      return;
+    }
+
     setLoading(true);
     try {
       const articleData = {
@@ -125,7 +142,9 @@ export default function AdminEditor({ articleToEdit, categories, articles = [], 
           errorMsg = `Erreur : ${parsedError.error}`;
         }
       } catch (e) {
-        errorMsg = `Erreur : ${error.message || "Inconnue"}`;
+        errorMsg = error?.code === 'permission-denied' || /insufficient permissions/i.test(error?.message || '')
+          ? "Enregistrement refusé par Firestore : session expirée (reconnectez-vous) ou champ invalide (date, lien PDF…)."
+          : `Erreur : ${error.message || "Inconnue"}`;
       }
       toast.error(errorMsg);
     } finally {
