@@ -92,7 +92,7 @@ service cloud.firestore {
              (!('slug' in data) || (data.slug is string && data.slug.size() <= 100)) &&
              data.contenuComplet is string && data.contenuComplet.size() > 0 && data.contenuComplet.size() <= 100000 &&
              data.date is string && data.date.matches("^\\d{4}-\\d{2}-\\d{2}$") &&
-             (!('extrait' in data) || (data.extrait is string && data.extrait.size() <= 1000)) &&
+             (!('extrait' in data) || (data.extrait is string && data.extrait.size() <= 5000)) &&
              (!('dateAffichee' in data) || (data.dateAffichee is string && data.dateAffichee.size() <= 100)) &&
              (!('indexations' in data) || (data.indexations is list && data.indexations.size() <= 50)) &&
              (!('authorUid' in data) || data.authorUid is string) &&
