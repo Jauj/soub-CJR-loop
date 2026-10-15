@@ -404,6 +404,9 @@ export default function AdminEditor({ articleToEdit, categories, articles = [], 
                         {categories.map(cat => (
                           <option key={cat.id} value={cat.nom}>{cat.nom}</option>
                         ))}
+                        {categories.length > 0 && idx.categorie && !categories.some(cat => cat.nom === idx.categorie) && (
+                          <option value={idx.categorie}>{idx.categorie} (hors liste)</option>
+                        )}
                         {categories.length === 0 && (
                           <>
                             <option value="International">International</option>
