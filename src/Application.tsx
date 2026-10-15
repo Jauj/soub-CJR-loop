@@ -14,7 +14,7 @@ import { Toaster, toast } from 'sonner';
 import { HelmetProvider, Helmet } from 'react-helmet-async';
 import { Article, LienRessource, Bulletin, Subscriber, Newsletter } from './types';
 import { convertToDirectLink } from './lib/utils';
-import { getArticles, getContent, saveContent, getLiens, saveLien, removeLien, getCategories, saveCategory, removeCategory } from './services/articleService';
+import { getArticles, saveArticle, getContent, saveContent, getLiens, saveLien, removeLien, getCategories, saveCategory, removeCategory } from './services/articleService';
 import { getBulletins } from './services/bulletinService';
 import AdminEditor from './components/AdminEditor';
 import BulletinEditor from './components/BulletinEditor';
@@ -453,6 +453,21 @@ function MainApp() {
 
     return finalIndex;
   }, [TOUS_LES_ARTICLES, categories]);
+
+  // Catégories utilisées dans les indexations mais absentes de la collection `categories`
+  // (non modifiables depuis la gestion des catégories : on propose de les fusionner)
+  const categoriesOrphelines = useMemo(() => {
+    const connues = new Set(categories.map(c => c.nom));
+    const parNom: Record<string, Article[]> = {};
+    articlesApi.forEach(article => {
+      (article.indexations || []).forEach(({ categorie }) => {
+        if (!categorie || connues.has(categorie)) return;
+        if (!parNom[categorie]) parNom[categorie] = [];
+        if (!parNom[categorie].includes(article)) parNom[categorie].push(article);
+      });
+    });
+    return Object.entries(parNom).map(([nom, articles]) => ({ nom, articles }));
+  }, [articlesApi, categories]);
 
   // Configuration du rendu Markdown (Comment transformer le texte en HTML)
   const markdownConfig = useMemo(() => 
@@ -1352,6 +1367,59 @@ function MainApp() {
                           </button>
                         </div>
                       </div>
+
+                      {/* Catégories portées par des articles mais absentes de la liste ci-dessus */}
+                      {categoriesOrphelines.length > 0 && (
+                        <div className="p-8 border-2 border-red-600/30 bg-red-600/[0.03] space-y-4">
+                          <h4 className="font-bold uppercase tracking-tight">Catégories hors liste</h4>
+                          <p className="text-sm text-black/50 italic">
+                            Ces catégories sont utilisées par des articles mais ne figurent pas dans la liste : elles apparaissent quand même dans l'Index.
+                            Choisissez la catégorie dans laquelle les fusionner (les articles concernés seront modifiés).
+                          </p>
+                          {categoriesOrphelines.map(({ nom, articles }) => (
+                            <div key={nom} className="flex flex-wrap gap-4 items-center p-4 border border-black/10 bg-white">
+                              <div className="flex-1 min-w-[200px]">
+                                <span className="font-bold uppercase tracking-tight">{nom}</span>
+                                <span className="text-xs text-black/50 ml-2">({articles.length} article{articles.length > 1 ? 's' : ''})</span>
+                              </div>
+                              <select id={`fusion-${nom}`} defaultValue="" className="p-3 border border-black/10 outline-none focus:border-red-600">
+                                <option value="" disabled>Fusionner dans…</option>
+                                {categories.map(cat => (
+                                  <option key={cat.id} value={cat.nom}>{cat.nom}</option>
+                                ))}
+                              </select>
+                              <button
+                                onClick={async () => {
+                                  const cible = (document.getElementById(`fusion-${nom}`) as HTMLSelectElement).value;
+                                  if (!cible) {
+                                    toast.error("Choisissez une catégorie cible.");
+                                    return;
+                                  }
+                                  if (!confirm(`Remplacer « ${nom} » par « ${cible} » dans ${articles.length} article(s) ?`)) return;
+                                  try {
+                                    for (const article of articles) {
+                                      await saveArticle({
+                                        ...article,
+                                        indexations: article.indexations.map(idx =>
+                                          idx.categorie === nom ? { ...idx, categorie: cible } : idx
+                                        ),
+                                      });
+                                    }
+                                    toast.success(`« ${nom} » fusionnée dans « ${cible} ».`);
+                                    refreshPublicData();
+                                  } catch (err) {
+                                    toast.error("Erreur lors de la fusion.");
+                                    refreshPublicData();
+                                  }
+                                }}
+                                className="bg-black text-white px-6 py-3 font-bold uppercase tracking-widest hover:bg-red-700 transition-all"
+                              >
+                                Fusionner
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
 
