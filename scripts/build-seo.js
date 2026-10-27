@@ -2,13 +2,21 @@
 //
 // PRINCIPE : on copie le shell Vite (dist/index.html) TEL QUEL et on ne touche
 // qu'au <head> : les balises marquées `data-seo` sont retirées puis remplacées
-// par celles de la page. Le <body> (skeleton, #root, assets) reste identique.
-// Au démarrage, React retire ces balises `data-seo` et pose les mêmes via
-// react-helmet-async : titres, canoniques et JSON-LD viennent tous de
-// src/seo/shared.js, donc la version statique et la version rendue concordent.
+// par celles de la page. Au démarrage, React retire ces balises `data-seo` et
+// pose les mêmes via react-helmet-async : titres, canoniques et JSON-LD viennent
+// tous de src/seo/shared.js, donc la version statique et la version rendue concordent.
+//
+// Dans le <body>, seule la zone principale du skeleton (.sk-main) reçoit le
+// contenu de la page (texte des articles, listes de liens) pour que les moteurs
+// le lisent sans exécuter le JavaScript. React masque tout le skeleton au démarrage.
 
 import fs from 'fs';
 import path from 'path';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
 import {
   BASE_URL, SITE_NAME, PAGES, canonicalUrl, articleSlug, articleSeo, pageSeo,
 } from '../src/seo/shared.js';
@@ -36,7 +44,86 @@ function loadBareShell() {
   return bare;
 }
 
-function renderPage(shell, seo) {
+// --- Contenu pré-rendu du <body> ---
+
+/** Markdown -> HTML avec les mêmes plugins (et la même sanitisation) que le site. */
+const markdownToHtml = (markdown) => renderToStaticMarkup(
+  createElement(ReactMarkdown, { rehypePlugins: [rehypeRaw, rehypeSanitize] }, String(markdown ?? '')),
+);
+
+const articlePath = (article) => `/article/${articleSlug(article)}`;
+
+const navHtml = () => `<nav class="prerendu-nav">${Object.entries(PAGES)
+  .map(([urlPath, page]) => `<a href="${urlPath}">${escapeHtml(page.name)}</a>`)
+  .join(' · ')}</nav>`;
+
+function articleBody(article) {
+  return [
+    navHtml(),
+    `<article>`,
+    `<h1>${escapeHtml(article.titre)}</h1>`,
+    article.dateAffichee || article.date ? `<p class="prerendu-date">${escapeHtml(article.dateAffichee || article.date)}</p>` : '',
+    article.extrait ? `<div class="prerendu-extrait">${markdownToHtml(article.extrait)}</div>` : '',
+    markdownToHtml(article.contenuComplet),
+    `</article>`,
+  ].join('\n');
+}
+
+const articleLink = (article) => `<a href="${articlePath(article)}">${escapeHtml(article.titre)}</a>`;
+
+function listBody(title, articles) {
+  const items = articles.map((article) => [
+    '<li>',
+    `<h2>${articleLink(article)}</h2>`,
+    article.dateAffichee || article.date ? `<p class="prerendu-date">${escapeHtml(article.dateAffichee || article.date)}</p>` : '',
+    article.extrait ? markdownToHtml(article.extrait) : '',
+    '</li>',
+  ].join(''));
+  return `${navHtml()}\n<h1>${escapeHtml(title)}</h1>\n<ul class="prerendu-liste">\n${items.join('\n')}\n</ul>`;
+}
+
+function indexBody(title, articles) {
+  const index = {};
+  for (const article of articles) {
+    for (const { categorie, terme } of article.indexations || []) {
+      const t = String(terme || '').trim();
+      if (!t) continue;
+      const cat = categorie || 'Non classé';
+      ((index[cat] ||= {})[t] ||= []).push(article);
+    }
+  }
+  const sections = Object.entries(index).map(([cat, termes]) => [
+    `<h2>${escapeHtml(cat)}</h2>`,
+    '<ul>',
+    ...Object.entries(termes)
+      .sort(([a], [b]) => a.localeCompare(b, 'fr'))
+      .map(([terme, liste]) => `<li><strong>${escapeHtml(terme)}</strong> : ${liste.map(articleLink).join(', ')}</li>`),
+    '</ul>',
+  ].join('\n'));
+  return `${navHtml()}\n<h1>${escapeHtml(title)}</h1>\n${sections.join('\n')}`;
+}
+
+const PRERENDU_CSS = '<style>'
+  + '#initial-skeleton .sk-main.prerendu{animation:none;color:#111;font-family:Georgia,serif;line-height:1.7;overflow-wrap:break-word}'
+  + '.prerendu h1{font-size:2rem;line-height:1.2;margin:1rem 0}.prerendu h2{font-size:1.25rem;margin:1.5rem 0 .25rem}'
+  + '.prerendu a{color:#b91c1c}.prerendu-nav{font-family:sans-serif;font-size:.8rem}'
+  + '.prerendu-date{color:#666;font-size:.9rem}.prerendu-extrait{font-style:italic}'
+  + '.prerendu-liste{list-style:none;padding:0}.prerendu img{max-width:100%;height:auto}'
+  + '</style>';
+
+/** Remplace le contenu de la zone principale du skeleton par `html`. */
+function injectBody(shell, html) {
+  const start = shell.indexOf('<div class="sk-main">');
+  const root = shell.indexOf('<div id="root"');
+  if (start === -1 || root === -1 || root < start) {
+    throw new Error('Zone .sk-main ou #root introuvable dans le shell : vérifier index.html.');
+  }
+  // .sk-main est le dernier enfant de #initial-skeleton : on ferme les deux avant #root
+  return `${shell.slice(0, start)}${PRERENDU_CSS}\n      <div class="sk-main prerendu">\n${html}\n      </div>\n    </div>\n    ${shell.slice(root)}`;
+}
+
+function renderPage(shell, seo, body) {
+  if (body) shell = injectBody(shell, body);
   const tags = [
     `<title data-seo>${escapeHtml(seo.title)}</title>`,
     `<meta data-seo name="description" content="${escapeHtml(seo.description)}" />`,
@@ -130,12 +217,17 @@ async function buildSEO() {
       continue;
     }
     seen.set(slug, article.id);
-    writePage(`/article/${slug}`, renderPage(shell, articleSeo(article)));
+    writePage(`/article/${slug}`, renderPage(shell, articleSeo(article), articleBody(article)));
   }
   const uniqueArticles = articles.filter((a) => seen.get(articleSlug(a)) === a.id);
 
+  const bodies = {
+    '/': () => listBody(SITE_NAME, uniqueArticles),
+    '/publications': () => listBody(PAGES['/publications'].name, uniqueArticles),
+    '/index-thematique': () => indexBody(PAGES['/index-thematique'].name, uniqueArticles),
+  };
   for (const urlPath of Object.keys(PAGES)) {
-    writePage(urlPath, renderPage(shell, pageSeo(urlPath)));
+    writePage(urlPath, renderPage(shell, pageSeo(urlPath), bodies[urlPath]?.()));
   }
 
   fs.writeFileSync(path.join(DIST, 'sitemap.xml'), buildSitemap(uniqueArticles), 'utf-8');
